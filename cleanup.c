@@ -1,0 +1,46 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+typedef struct {
+    long mtype;
+    int terminate;
+} Message;
+
+int main() {
+    int msgid;
+    Message message;
+    char input;
+
+    msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    if (msgid == -1) {
+        perror("msgget failed");
+        exit(EXIT_FAILURE);
+    }
+
+    message.mtype = 1;
+    message.terminate = 1;
+
+    while (1) {
+        printf("Do you want the Air Traffic Control System to terminate?(Y for Yes and N for No)\n");
+        scanf(" %c", &input);
+
+        if (input == 'Y' || input == 'y') {
+            if (msgsnd(msgid, &message, sizeof(message), 0) == -1) {
+                perror("msgsnd failed");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        }
+    }
+
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl failed");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
