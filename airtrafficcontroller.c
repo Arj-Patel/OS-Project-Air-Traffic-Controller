@@ -6,8 +6,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
-#define MAX_AIRPORTS 10
-#define MAX_PLANES 100
+#define MAX_AIRPORTS 100
 
 typedef struct {
     long mtype;
@@ -22,20 +21,19 @@ typedef struct {
 typedef struct {
     long mtype;
     int airport_id;
-    int num_planes;
+    int status; // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
 } Airport;
 
 int main() {
     int num_airports;
-    int msgid;
+    printf("Enter the number of airports to be handled/managed: ");
+    scanf("%d", &num_airports);
+
     Plane plane;
     Airport airport;
     FILE *file;
 
-    printf("Enter the number of airports to be handled/managed: ");
-    scanf("%d", &num_airports);
-
-    msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    int msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
     if (msgid == -1) {
         perror("msgget failed");
         exit(EXIT_FAILURE);
@@ -52,10 +50,31 @@ int main() {
         }
 
         // Inform the departure airport to begin the boarding/loading and the takeoff process
-        // Wait for a message from the departure airport indicating that the takeoff process is complete
-        // Inform the arrival airport regarding the arrival of the plane
+        airport.mtype = plane.departure_airport;
+        airport.airport_id = plane.departure_airport;
+        airport.status = 0;
+        if (msgsnd(msgid, &airport, sizeof(airport), 0) == -1) {
+            perror("msgsnd failed");
+            exit(EXIT_FAILURE);
+        }
 
-        if (msgrcv(msgid, &airport, sizeof(airport), 2, 0) == -1) {
+        // Wait for a message from the departure airport indicating that the takeoff process is complete
+        if (msgrcv(msgid, &airport, sizeof(airport), plane.departure_airport, 0) == -1) {
+            perror("msgrcv failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Inform the arrival airport regarding the arrival of the plane
+        airport.mtype = plane.arrival_airport;
+        airport.airport_id = plane.arrival_airport;
+        airport.status = 1;
+        if (msgsnd(msgid, &airport, sizeof(airport), 0) == -1) {
+            perror("msgsnd failed");
+            exit(EXIT_FAILURE);
+        }
+
+        // Wait for a message from the arrival airport indicating that the landing and deboarding/unloading process is complete
+        if (msgrcv(msgid, &airport, sizeof(airport), plane.arrival_airport, 0) == -1) {
             perror("msgrcv failed");
             exit(EXIT_FAILURE);
         }

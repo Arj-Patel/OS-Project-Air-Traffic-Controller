@@ -79,7 +79,7 @@ int main() {
             }
         }
 
-        total_weight += num_seats * CREW_WEIGHT;
+        total_weight += 5 * CREW_WEIGHT;
     } else {
         printf("Enter Number of Cargo Items: ");
         scanf("%d", &num_cargo_items);
@@ -101,7 +101,41 @@ int main() {
     // Send a message to the air traffic controller with the plane details
     // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
 
-    printf("Plane has successfully traveled from Airport %d to Airport %d!\n", departure_airport, arrival_airport);
+    // Create a message queue
+    int msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    if (msgid == -1) {
+        perror("msgget");
+        exit(EXIT_FAILURE);
+    }
+
+    // Send a message to the air traffic controller with the plane details
+    if (msgsnd(msgid, &plane, sizeof(plane), 0) == -1) {
+        perror("msgsnd");
+        exit(EXIT_FAILURE);
+    }
+
+    // Simulate the boarding/loading process
+    sleep(3);
+
+    // Simulate the journey
+    sleep(30);
+
+    // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
+    if (msgrcv(msgid, &plane, sizeof(plane), 1, 0) == -1) {
+        perror("msgrcv");
+        exit(EXIT_FAILURE);
+    }
+
+    // Simulate the deboarding/unloading process
+    sleep(3);
+
+    printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
+
+    // Remove the message queue
+    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
+        perror("msgctl");
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
