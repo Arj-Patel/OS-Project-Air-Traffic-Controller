@@ -7,7 +7,7 @@
 #include <sys/msg.h>
 
 #define MAX_PLANES 10
-#define MAX_AIRPORTS 100
+#define MAX_AIRPORTS 10
 
 typedef struct {
     long mtype;
