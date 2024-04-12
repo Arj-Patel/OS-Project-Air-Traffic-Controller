@@ -15,7 +15,8 @@ int main() {
     Message message;
     char input;
 
-    msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    key_t key = ftok(".", 'a');
+    int msgid = msgget(key, 0666 | IPC_CREAT);
     if (msgid == -1) {
         perror("msgget failed");
         exit(EXIT_FAILURE);
@@ -35,11 +36,6 @@ int main() {
             }
             break;
         }
-    }
-
-    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
-        perror("msgctl failed");
-        exit(EXIT_FAILURE);
     }
 
     return 0;

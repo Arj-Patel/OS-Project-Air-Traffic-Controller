@@ -88,10 +88,8 @@ int main() {
     int msgid;
 
     // ftok to generate unique key
-    key = ftok("progfile", 65);
-
-    // msgget creates a message queue and returns identifier
-    msgid = msgget(key, 0666 | IPC_CREAT);
+    key_t key = ftok(".", 'a');
+    int msgid = msgget(key, 0666 | IPC_CREAT);
 
     // Wait for messages from air traffic controller
     while (1) {
@@ -106,7 +104,6 @@ int main() {
         pthread_create(&thread, NULL, handlePlane, (void*)&plane);
     }
 
-    // Cleanup and terminate process
-    msgctl(msgid, IPC_RMID, NULL);
+    
     return 0;
 }

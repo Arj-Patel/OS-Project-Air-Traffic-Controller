@@ -6,6 +6,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
+#define MAX_PLANES 10
 #define MAX_AIRPORTS 100
 
 typedef struct {
@@ -33,7 +34,8 @@ int main() {
     Airport airport;
     FILE *file;
 
-    int msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
+    key_t key = ftok(".", 'a');
+    int msgid = msgget(key, 0666 | IPC_CREAT);
     if (msgid == -1) {
         perror("msgget failed");
         exit(EXIT_FAILURE);

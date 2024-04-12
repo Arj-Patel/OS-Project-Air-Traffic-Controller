@@ -12,7 +12,8 @@
 #define CREW_WEIGHT 75
 #define MAX_AIRPORTS 10
 
-typedef struct {
+typedef struct
+{
     long mtype;
     int plane_id;
     int plane_type;
@@ -22,7 +23,8 @@ typedef struct {
     int arrival_airport;
 } Plane;
 
-int main() {
+int main()
+{
     int plane_id, plane_type, num_seats, num_cargo_items, avg_cargo_weight;
     int departure_airport, arrival_airport;
     int total_weight = 0;
@@ -36,23 +38,28 @@ int main() {
     printf("Enter Type of Plane: ");
     scanf("%d", &plane_type);
 
-    if (plane_type == 1) {
+    if (plane_type == 1)
+    {
         printf("Enter Number of Occupied Seats: ");
         scanf("%d", &num_seats);
 
-        for (i = 0; i < num_seats; i++) {
-            if (pipe(pipefd) == -1) {
+        for (i = 0; i < num_seats; i++)
+        {
+            if (pipe(pipefd) == -1)
+            {
                 perror("pipe");
                 exit(EXIT_FAILURE);
             }
 
             pid = fork();
-            if (pid == -1) {
+            if (pid == -1)
+            {
                 perror("fork");
                 exit(EXIT_FAILURE);
             }
 
-            if (pid == 0) {
+            if (pid == 0)
+            {
                 close(pipefd[0]);
 
                 printf("Enter Weight of Your Luggage: ");
@@ -66,7 +73,9 @@ int main() {
 
                 close(pipefd[1]);
                 exit(EXIT_SUCCESS);
-            } else {
+            }
+            else
+            {
                 close(pipefd[1]);
 
                 read(pipefd[0], &luggage_weight, sizeof(int));
@@ -79,8 +88,10 @@ int main() {
             }
         }
 
-        total_weight += 5 * CREW_WEIGHT;
-    } else {
+        total_weight += 7 * CREW_WEIGHT;
+    }
+    else
+    {
         printf("Enter Number of Cargo Items: ");
         scanf("%d", &num_cargo_items);
 
@@ -96,20 +107,23 @@ int main() {
     printf("Enter Airport Number for Arrival: ");
     scanf("%d", &arrival_airport);
 
-    Plane plane = {1, plane_id, plane_type, total_weight, num_seats, departure_airport, arrival_airport};
+    Plane plane = {plane_id, plane_id, plane_type, total_weight, num_seats, departure_airport, arrival_airport};
 
     // Send a message to the air traffic controller with the plane details
     // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
 
     // Create a message queue
-    int msgid = msgget(IPC_PRIVATE, 0666 | IPC_CREAT);
-    if (msgid == -1) {
+    key_t key = ftok(".", 'a');
+    int msgid = msgget(key, 0666 | IPC_CREAT);
+    if (msgid == -1)
+    {
         perror("msgget");
         exit(EXIT_FAILURE);
     }
 
     // Send a message to the air traffic controller with the plane details
-    if (msgsnd(msgid, &plane, sizeof(plane), 0) == -1) {
+    if (msgsnd(msgid, &plane, sizeof(plane), 0) == -1)
+    {
         perror("msgsnd");
         exit(EXIT_FAILURE);
     }
@@ -121,7 +135,8 @@ int main() {
     sleep(30);
 
     // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
-    if (msgrcv(msgid, &plane, sizeof(plane), 1, 0) == -1) {
+    if (msgrcv(msgid, &plane, sizeof(plane), plane_id, 0) == -1)
+    {
         perror("msgrcv");
         exit(EXIT_FAILURE);
     }
@@ -130,12 +145,6 @@ int main() {
     sleep(3);
 
     printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
-
-    // Remove the message queue
-    if (msgctl(msgid, IPC_RMID, NULL) == -1) {
-        perror("msgctl");
-        exit(EXIT_FAILURE);
-    }
 
     return 0;
 }
