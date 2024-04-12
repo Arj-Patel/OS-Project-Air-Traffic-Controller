@@ -12,19 +12,32 @@ typedef struct {
     pthread_mutex_t mutex;
 } Runway;
 
-typedef struct {
-    int airportNumber;
-    int numberOfRunways;
-    Runway runways[11]; // 10 runways + 1 backup
+typedef struct
+{
+    long mtype;
+    int plane_id;
+    int plane_type;
+    int total_weight;
+    int num_passengers;
+    int departure_airport;
+    int arrival_airport;
+} Plane;
+
+typedef struct
+{
+    long mtype;
+    int airport_id;
+    int status; // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
+    Plane plane; // Plane details
 } Airport;
 
 typedef struct {
-    int planeID;
-    int totalWeight;
-    int isArrival; // 1 for arrival, 0 for departure
-} Plane;
+    int airportNumber;
+    int numberOfRunways;
+    Runway runways[11];
+} AirportDetails;
 
-Airport airport;
+AirportDetails airportDetails;
 
 void* handlePlane(void* arg) {
     Plane* plane = (Plane*)arg;
@@ -32,56 +45,56 @@ void* handlePlane(void* arg) {
     int minDiff = INT_MAX;
 
     // Find suitable runway and handle arrival or departure
-    for (int i = 0; i < airport.numberOfRunways; i++) {
-        if (pthread_mutex_trylock(&airport.runways[i].mutex) == 0) {
-            int diff = airport.runways[i].loadCapacity - plane->totalWeight;
+    for (int i = 0; i < airportDetails.numberOfRunways; i++) {
+        if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0) {
+            int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
             if (diff >= 0 && diff < minDiff) {
                 if (bestFitIndex != -1) {
-                    pthread_mutex_unlock(&airport.runways[bestFitIndex].mutex);
+                    pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
                 }
                 bestFitIndex = i;
                 minDiff = diff;
             } else {
-                pthread_mutex_unlock(&airport.runways[i].mutex);
+                pthread_mutex_unlock(&airportDetails.runways[i].mutex);
             }
         }
     }
 
     if (bestFitIndex == -1) {
-        bestFitIndex = airport.numberOfRunways;
-        pthread_mutex_lock(&airport.runways[bestFitIndex].mutex);
+        bestFitIndex = airportDetails.numberOfRunways;
+        pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
     }
 
-    if (plane->isArrival) {
+    if (plane->arrival_airport == airportDetails.airportNumber) {
         sleep(2); // Simulate landing
-        printf("Plane %d has landed on Runway No. %d of Airport No. %d\n", plane->planeID, bestFitIndex+1, airport.airportNumber);
+        printf("Plane %d has landed on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex+1, airportDetails.airportNumber);
         sleep(3); // Simulate deboarding/unloading
-        printf("Plane %d has completed deboarding/unloading\n", plane->planeID);
+        printf("Plane %d has completed deboarding/unloading\n", plane->plane_id);
     } else {
         sleep(3); // Simulate boarding/loading
-        printf("Plane %d has completed boarding/loading on Runway No. %d of Airport No. %d\n", plane->planeID, bestFitIndex+1, airport.airportNumber);
+        printf("Plane %d has completed boarding/loading on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex+1, airportDetails.airportNumber);
         sleep(2); // Simulate takeoff
-        printf("Plane %d has taken off\n", plane->planeID);
+        printf("Plane %d has taken off\n", plane->plane_id);
     }
 
-    pthread_mutex_unlock(&airport.runways[bestFitIndex].mutex);
+    pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
     pthread_exit(NULL);
 }
 
 int main() {
     // Initialize airport
-    airport.airportNumber = 1; // Set airport number
-    airport.numberOfRunways = 10; // Set number of runways
+    airportDetails.airportNumber = 1; // Set airport number
+    airportDetails.numberOfRunways = 10; // Set number of runways
 
     // Initialize runways
-    for (int i = 0; i < airport.numberOfRunways; i++) {
-        airport.runways[i].loadCapacity = 1000; // Set load capacity
-        pthread_mutex_init(&airport.runways[i].mutex, NULL); // Initialize mutex
+    for (int i = 0; i < airportDetails.numberOfRunways; i++) {
+        airportDetails.runways[i].loadCapacity = 1000; // Set load capacity
+        pthread_mutex_init(&airportDetails.runways[i].mutex, NULL); // Initialize mutex
     }
 
     // Initialize backup runway
-    airport.runways[airport.numberOfRunways].loadCapacity = 2000; // Set load capacity
-    pthread_mutex_init(&airport.runways[airport.numberOfRunways].mutex, NULL); // Initialize mutex
+    airportDetails.runways[airportDetails.numberOfRunways].loadCapacity = 2000; // Set load capacity
+    pthread_mutex_init(&airportDetails.runways[airportDetails.numberOfRunways].mutex, NULL); // Initialize mutex
 
     // Set up message queue
     key_t key;
@@ -97,13 +110,12 @@ int main() {
         msgrcv(msgid, &plane, sizeof(plane), 1, 0);
 
         // If termination message, break the loop
-        if (plane.planeID == -1) break;
+        if (plane.plane_id == -1) break;
 
         // Create new thread to handle plane
         pthread_t thread;
         pthread_create(&thread, NULL, handlePlane, (void*)&plane);
     }
 
-    
     return 0;
 }
