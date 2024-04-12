@@ -132,10 +132,14 @@ int main()
     sleep(3);
 
     // Simulate the journey
-    sleep(30);
+    sleep(3);
 
     // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
-    if (msgrcv(msgid, &plane, sizeof(plane), plane_id, 0) == -1)
+    if (msgrcv(msgid, &plane, sizeof(plane), plane_id+10, 0) != -1)
+    {
+        printf("msg recieved\n");
+    }
+    else
     {
         perror("msgrcv");
         exit(EXIT_FAILURE);
