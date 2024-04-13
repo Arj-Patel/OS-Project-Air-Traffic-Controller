@@ -101,7 +101,8 @@ void *handlePlane(void *arg)
     }
 
     pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-    pthread_exit(NULL);
+    // printf("here1\n");
+    // pthread_exit(NULL);
 }
 
 void *handleArrival(void *arg)
@@ -113,7 +114,7 @@ void *handleArrival(void *arg)
 
     // Handle landing and deboarding/unloading
     handlePlane(plane);
-    airport->mtype = plane->plane_id + 50; // Send landing and deboarding/unloading complete message
+    airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
     if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
     {
         perror("msgsnd failed");
@@ -135,7 +136,9 @@ void *handleDeparture(void *arg)
 
     // Handle takeoff
     handlePlane(plane);
-    airport->mtype = plane->plane_id + 40; // Send takeoff complete message
+    // printf("here\n");
+    //TODO: check whether the ATC recieves this message and continue from there
+    airport->mtype = plane->plane_id + 20; // Send takeoff complete message
     if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
     {
         perror("msgsnd failed");
@@ -184,7 +187,18 @@ int main()
         Airport airport;
         int mtype;
         bool messageReceived = false;
-        for (mtype = 21; mtype <= 40; mtype++)
+        for (mtype = 41+10*(airportDetails.airportNumber-1); mtype <= 40 + 10 * airportDetails.airportNumber; mtype++)
+        {
+            // printf("here\n");
+            if (msgrcv(msgid, &airport, sizeof(airport), mtype, IPC_NOWAIT) != -1)
+            {
+                // Handle message
+                printf("Received message from air traffic controller%d\n", mtype);
+                messageReceived = true;
+                break;
+            }
+        }
+        for (mtype = 141+10*(airportDetails.airportNumber-1); mtype <= 140 + 10 * airportDetails.airportNumber; mtype++)
         {
             // printf("here\n");
             if (msgrcv(msgid, &airport, sizeof(airport), mtype, IPC_NOWAIT) != -1)
@@ -211,14 +225,15 @@ int main()
 
             // Create new thread to handle airport
             pthread_t thread;
-            if (airport.mtype >= 31 && airport.mtype <= 40)
+            if (airport.mtype > 40+10*(airportDetails.airportNumber-1) && airport.mtype <= 40 + 10 * airportDetails.airportNumber)
             {
-                printf("arrival\n");
-                pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&airport);
-            }
-            else if (airport.mtype >= 21 && airport.mtype <= 30)
-            {
+                printf("departure\n");
                 pthread_create(&threads[thread_count++], NULL, handleDeparture, (void *)&airport);
+            }
+            else if (airport.mtype > 140 + 10*(airportDetails.airportNumber-1) && airport.mtype <= 140 + 10 * airportDetails.airportNumber)
+            {
+                
+                pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&airport);
             }
         }
         pthread_mutex_lock(&hasFinishedMutex);

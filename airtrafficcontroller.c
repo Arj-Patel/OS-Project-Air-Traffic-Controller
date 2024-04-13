@@ -111,7 +111,7 @@ int main()
                 {
                     printf("ATC sent departure message\n");
                     hasSentDepartedMsg[i] = 1;
-                    airports[planes[i].departure_airport].mtype = i + 20;
+                    airports[planes[i].departure_airport].mtype = i + 40 + (planes[i].departure_airport-1)*10;
                     airports[planes[i].departure_airport].airport_id = planes[i].departure_airport;
                     airports[planes[i].departure_airport].plane = planes[i]; // Add plane details
                     if (msgsnd(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), 0) == -1)
@@ -120,9 +120,9 @@ int main()
                         exit(EXIT_FAILURE);
                     }
                 }
-
+                //TODO: check if we recieve the message from the airport.
                 // Non-blocking receive for takeoff complete message from departure airport i.e. the plane has departed
-                if (msgrcv(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), i + 40, IPC_NOWAIT) != -1)
+                if (msgrcv(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), i + 20, IPC_NOWAIT) != -1)
                 {
                     if (airports[planes[i].departure_airport].status == 0)
                     {
@@ -141,7 +141,7 @@ int main()
                     {
                         printf("ATC sent arrival message\n");
                         hasSentArrivalMsg[i] = 1;
-                        airports[planes[i].arrival_airport].mtype = i + 30;
+                        airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport-1)*10;
                         airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
                         airports[planes[i].arrival_airport].plane = planes[i]; // Add plane details
                         if (msgsnd(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), 0) == -1)
@@ -152,7 +152,7 @@ int main()
                     }
 
                     // Non-blocking receive for landing and deboarding/unloading complete message from arrival airport
-                    if (msgrcv(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), i + 50, IPC_NOWAIT) != -1)
+                    if (msgrcv(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), i + 30, IPC_NOWAIT) != -1)
                     {
                         printf("plane arrived message\n");
                         if (airports[planes[i].arrival_airport].status == 1)
