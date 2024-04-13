@@ -16,6 +16,12 @@
 typedef struct
 {
     long mtype;
+    int takeOff;
+} TakeOffMessage;
+
+typedef struct
+{
+    long mtype;
     int plane_id;
     int plane_type;
     int total_weight;
@@ -111,7 +117,7 @@ int main()
                 {
                     printf("ATC sent departure message\n");
                     hasSentDepartedMsg[i] = 1;
-                    airports[planes[i].departure_airport].mtype = i + 40 + (planes[i].departure_airport-1)*10;
+                    airports[planes[i].departure_airport].mtype = i + 40 + (planes[i].departure_airport - 1) * 10;
                     airports[planes[i].departure_airport].airport_id = planes[i].departure_airport;
                     airports[planes[i].departure_airport].plane = planes[i]; // Add plane details
                     if (msgsnd(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), 0) == -1)
@@ -120,11 +126,28 @@ int main()
                         exit(EXIT_FAILURE);
                     }
                 }
-                //TODO: check if we recieve the message from the airport.
-                // Non-blocking receive for takeoff complete message from departure airport i.e. the plane has departed
-                if (msgrcv(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), i + 20, IPC_NOWAIT) != -1)
+                // TODO: check if we recieve the message from the airport. DONE
+                //  Non-blocking receive for takeoff complete message from departure airport i.e. the plane has departed
+                //  printf("checking\n");
+                //  if (msgrcv(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), i + 20, IPC_NOWAIT) != -1)
+                //  {
+                //      printf("plane departed message recieved\n");
+                //      if (airports[planes[i].departure_airport].status == 0)
+                //      {
+                //          fprintf(file, "Plane %d has departed from Airport %d and will land at Airport %d.\n",
+                //                  planes[i].plane_id,
+                //                  planes[i].departure_airport,
+                //                  planes[i].arrival_airport);
+                //          hasDeparted[i] = 1;
+                //      }
+                //  }
+
+                TakeOffMessage msg;
+
+                if (msgrcv(msgid, &msg, sizeof(msg), i + 20, IPC_NOWAIT) != -1)
                 {
-                    if (airports[planes[i].departure_airport].status == 0)
+                    printf("plane departed message received\n");
+                    if (msg.takeOff == 1)
                     {
                         fprintf(file, "Plane %d has departed from Airport %d and will land at Airport %d.\n",
                                 planes[i].plane_id,
@@ -141,7 +164,7 @@ int main()
                     {
                         printf("ATC sent arrival message\n");
                         hasSentArrivalMsg[i] = 1;
-                        airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport-1)*10;
+                        airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
                         airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
                         airports[planes[i].arrival_airport].plane = planes[i]; // Add plane details
                         if (msgsnd(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), 0) == -1)
@@ -163,6 +186,7 @@ int main()
                 }
 
                 // If the plane has arrived, inform the plane process
+                //TODO: check whether ATC is sending the below message or not. i.e. check if hasArrived[i] is 1 or not in line 181. 
                 if (hasArrived[i])
                 {
                     planes[i].mtype = i + 10;

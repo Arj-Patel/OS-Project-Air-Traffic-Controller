@@ -26,6 +26,12 @@ typedef struct
 typedef struct
 {
     long mtype;
+    int takeOff;
+} TakeOffMessage;
+
+typedef struct
+{
+    long mtype;
     int plane_id;
     int plane_type;
     int total_weight;
@@ -137,13 +143,31 @@ void *handleDeparture(void *arg)
     // Handle takeoff
     handlePlane(plane);
     // printf("here\n");
-    //TODO: check whether the ATC recieves this message and continue from there
-    airport->mtype = plane->plane_id + 20; // Send takeoff complete message
-    if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
+    //TODO: check whether the ATC recieves this message and continue from there DONE
+    // airport->mtype = plane->plane_id + 20; // Send takeoff complete message
+    // if (msgsnd(msgid, airport, sizeof(*airport), 0) != -1)
+    // {
+    //     printf("Sent takeoff complete message to ATC\n");
+    // }
+    // else
+    // {
+    //     perror("msgsnd failed");
+    //     exit(1);
+    // }
+    TakeOffMessage msg;
+    msg.mtype = plane->plane_id+20; // or any other type you want
+    msg.takeOff = 1;
+
+    if (msgsnd(msgid, &msg, sizeof(msg), 0) != -1)
+    {
+        printf("Sent takeoff complete message to ATC\n");
+    }
+    else
     {
         perror("msgsnd failed");
         exit(1);
     }
+
     pthread_mutex_lock(&hasFinishedMutex);
     hasFinished[*(int *)arg] = true;
     pthread_mutex_unlock(&hasFinishedMutex);
@@ -236,23 +260,23 @@ int main()
                 pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&airport);
             }
         }
-        pthread_mutex_lock(&hasFinishedMutex);
-        for (int i = 0; i < thread_count; i++)
-        {
-            if (hasFinished[i])
-            {
-                pthread_join(threads[i], NULL);
-                // Shift remaining threads down
-                for (int j = i; j < thread_count - 1; j++)
-                {
-                    threads[j] = threads[j + 1];
-                    hasFinished[j] = hasFinished[j + 1];
-                }
-                thread_count--;
-                i--; // Decrement i to account for the removed thread
-            }
-        }
-        pthread_mutex_unlock(&hasFinishedMutex);
+        // pthread_mutex_lock(&hasFinishedMutex);
+        // for (int i = 0; i < thread_count; i++)
+        // {
+        //     if (hasFinished[i])
+        //     {
+        //         pthread_join(threads[i], NULL);
+        //         // Shift remaining threads down
+        //         for (int j = i; j < thread_count - 1; j++)
+        //         {
+        //             threads[j] = threads[j + 1];
+        //             hasFinished[j] = hasFinished[j + 1];
+        //         }
+        //         thread_count--;
+        //         i--; // Decrement i to account for the removed thread
+        //     }
+        // }
+        // pthread_mutex_unlock(&hasFinishedMutex);
     }
 
     for (int i = 0; i < thread_count; i++)
