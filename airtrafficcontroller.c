@@ -87,6 +87,7 @@ int main()
         {
             if (msgrcv(msgid, &planes[i], sizeof(planes[i]), i, IPC_NOWAIT) != -1)
             {
+                printf("plane asked to depart\n");
                 isPresent[i] = 1;
             }
             else if (errno != ENOMSG)
@@ -104,17 +105,11 @@ int main()
             }
             else
             {
-                // planes[i].mtype = i + 10;
-                // if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
-                // {
-                //     perror("msgsnd failed");
-                //     exit(EXIT_FAILURE);
-                // }
-                // isPresent[i] = 0;
 
-                // Inform the departure airport
+                // Inform the departure airport to depart the plane
                 if (!hasSentDepartedMsg[i])
                 {
+                    printf("ATC sent departure message\n");
                     hasSentDepartedMsg[i] = 1;
                     airports[planes[i].departure_airport].mtype = i + 20;
                     airports[planes[i].departure_airport].airport_id = planes[i].departure_airport;
@@ -126,11 +121,15 @@ int main()
                     }
                 }
 
-                // Non-blocking receive for takeoff complete message from departure airport
+                // Non-blocking receive for takeoff complete message from departure airport i.e. the plane has departed
                 if (msgrcv(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), i + 40, IPC_NOWAIT) != -1)
                 {
                     if (airports[planes[i].departure_airport].status == 0)
                     {
+                        fprintf(file, "Plane %d has departed from Airport %d and will land at Airport %d.\n",
+                                planes[i].plane_id,
+                                planes[i].departure_airport,
+                                planes[i].arrival_airport);
                         hasDeparted[i] = 1;
                     }
                 }
@@ -140,6 +139,7 @@ int main()
                 {
                     if (!hasSentArrivalMsg[i])
                     {
+                        printf("ATC sent arrival message\n");
                         hasSentArrivalMsg[i] = 1;
                         airports[planes[i].arrival_airport].mtype = i + 30;
                         airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
@@ -154,6 +154,7 @@ int main()
                     // Non-blocking receive for landing and deboarding/unloading complete message from arrival airport
                     if (msgrcv(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), i + 50, IPC_NOWAIT) != -1)
                     {
+                        printf("plane arrived message\n");
                         if (airports[planes[i].arrival_airport].status == 1)
                         {
                             hasArrived[i] = 1;
@@ -167,6 +168,7 @@ int main()
                     planes[i].mtype = i + 10;
                     if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
                     {
+                        printf("ATC sent plane arrived message to plane\n");
                         perror("msgsnd failed");
                         exit(EXIT_FAILURE);
                     }
@@ -176,6 +178,7 @@ int main()
                     hasArrived[i] = 0;
                     hasSentDepartedMsg[i] = 0;
                     hasSentArrivalMsg[i] = 0;
+                    isPresent[i] = 0;
                 }
             }
         }
