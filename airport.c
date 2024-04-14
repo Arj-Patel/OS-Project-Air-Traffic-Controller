@@ -125,6 +125,7 @@ void *handleArrival(void *arg)
     int msgid = msgget(key, 0666);
 
     // Handle landing and deboarding/unloading
+    sleep(60);
     handlePlane(plane);
     //TODO: make this a simple hasArrived message DONE
     // airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
