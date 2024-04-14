@@ -32,6 +32,12 @@ typedef struct
 typedef struct
 {
     long mtype;
+    int deboardingComplete;
+} DeboardingMessage;
+
+typedef struct
+{
+    long mtype;
     int plane_id;
     int plane_type;
     int total_weight;
@@ -120,12 +126,24 @@ void *handleArrival(void *arg)
 
     // Handle landing and deboarding/unloading
     handlePlane(plane);
-    airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
-    if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
+    //TODO: make this a simple hasArrived message DONE
+    // airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
+    // if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
+    // {
+    //     perror("msgsnd failed");
+    //     exit(1);
+    // }
+
+    DeboardingMessage msg;
+    msg.mtype = plane->plane_id+30; 
+    msg.deboardingComplete = 1;
+
+    if(msgsnd(msgid, &msg, sizeof(msg), 0) == -1)
     {
         perror("msgsnd failed");
         exit(1);
     }
+
     pthread_mutex_lock(&hasFinishedMutex);
     hasFinished[*(int *)arg] = true;
     pthread_mutex_unlock(&hasFinishedMutex);

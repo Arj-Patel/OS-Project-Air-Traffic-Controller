@@ -178,10 +178,10 @@ int main()
                     if (msgrcv(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), i + 30, IPC_NOWAIT) != -1)
                     {
                         printf("plane arrived message\n");
-                        if (airports[planes[i].arrival_airport].status == 1)
-                        {
+                        // if (airports[planes[i].arrival_airport].status == 1)
+                        // {
                             hasArrived[i] = 1;
-                        }
+                        // }
                     }
                 }
 
