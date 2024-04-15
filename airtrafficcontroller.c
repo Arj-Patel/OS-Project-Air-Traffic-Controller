@@ -22,6 +22,12 @@ typedef struct
 typedef struct
 {
     long mtype;
+    int deboardingComplete;
+} DeboardingMessage;
+
+typedef struct
+{
+    long mtype;
     int plane_id;
     int plane_type;
     int total_weight;
@@ -30,13 +36,13 @@ typedef struct
     int arrival_airport;
 } Plane;
 
-typedef struct
-{
-    long mtype;
-    int airport_id;
-    int status;  // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
-    Plane plane; // Plane details
-} Airport;
+// typedef struct
+// {
+//     long mtype;
+//     int airport_id;
+//     int status;  // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
+//     Plane plane; // Plane details
+// } Airport;
 
 typedef struct
 {
@@ -51,7 +57,7 @@ int main()
     scanf("%d", &num_airports);
 
     Plane plane;
-    Airport airport;
+    // Airport airport;
     Message message;
     FILE *file;
 
@@ -64,7 +70,7 @@ int main()
     }
 
     Plane planes[MAX_PLANES + 1];
-    Airport airports[MAX_AIRPORTS + 1];
+    // Airport airports[MAX_AIRPORTS + 1];
 
     file = fopen("AirTrafficController.txt", "a");
     if (file == NULL)
@@ -78,6 +84,9 @@ int main()
     int hasArrived[MAX_PLANES + 1] = {0};
     int hasSentDepartedMsg[MAX_PLANES + 1] = {0};
     int hasSentArrivalMsg[MAX_PLANES + 1] = {0};
+
+    DeboardingMessage dbmsg;
+    TakeOffMessage tkoffmsg;
 
     while (1)
     {
@@ -117,10 +126,11 @@ int main()
                 {
                     printf("ATC sent departure message %d\n", i);
                     hasSentDepartedMsg[i] = 1;
-                    airports[planes[i].departure_airport].mtype = i + 40 + (planes[i].departure_airport - 1) * 10;
-                    airports[planes[i].departure_airport].airport_id = planes[i].departure_airport;
-                    airports[planes[i].departure_airport].plane = planes[i]; // Add plane details
-                    if (msgsnd(msgid, &airports[planes[i].departure_airport], sizeof(airports[planes[i].departure_airport]), 0) == -1)
+                    // airports[planes[i].departure_airport].mtype = i + 40 + (planes[i].departure_airport - 1) * 10;
+                    // airports[planes[i].departure_airport].airport_id = planes[i].departure_airport;
+                    // airports[planes[i].departure_airport].plane = planes[i]; // Add plane details
+                    planes[i].mtype = i + 40 + (planes[i].departure_airport - 1) * 10;
+                    if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
                     {
                         perror("msgsnd failed");
                         exit(EXIT_FAILURE);
@@ -142,12 +152,12 @@ int main()
                 //      }
                 //  }
 
-                TakeOffMessage msg;
+                
 
-                if (msgrcv(msgid, &msg, sizeof(msg), i + 20, IPC_NOWAIT) != -1)
+                if (msgrcv(msgid, &tkoffmsg, sizeof(tkoffmsg), i + 20, IPC_NOWAIT) != -1)
                 {
                     printf("plane departed message received %d\n", i);
-                    if (msg.takeOff == 1)
+                    if (tkoffmsg.takeOff == 1)
                     {
                         fprintf(file, "Plane %d has departed from Airport %d and will land at Airport %d.\n",
                                 planes[i].plane_id,
@@ -164,10 +174,11 @@ int main()
                     {
                         printf("ATC sent arrival message %d\n", i);
                         hasSentArrivalMsg[i] = 1;
-                        airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
-                        airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
-                        airports[planes[i].arrival_airport].plane = planes[i]; // Add plane details
-                        if (msgsnd(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), 0) == -1)
+                        // airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
+                        // airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
+                        // airports[planes[i].arrival_airport].plane = planes[i]; // Add plane details
+                        planes[i].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
+                        if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
                         {
                             perror("msgsnd failed");
                             exit(EXIT_FAILURE);
@@ -175,7 +186,7 @@ int main()
                     }
 
                     // Non-blocking receive for landing and deboarding/unloading complete message from arrival airport
-                    if (msgrcv(msgid, &airports[planes[i].arrival_airport], sizeof(airports[planes[i].arrival_airport]), i + 30, IPC_NOWAIT) != -1)
+                    if (msgrcv(msgid, &dbmsg, sizeof(dbmsg), i + 30, IPC_NOWAIT) != -1)
                     {
                         printf("plane arrived message %d\n", i);
                         // if (airports[planes[i].arrival_airport].status == 1)

@@ -10,6 +10,7 @@
 #include <stdbool.h>
 
 #define MAX_THREADS 1000
+#define MAX_PLANES 100
 
 pthread_t threads[MAX_THREADS];
 int thread_count = 0;
@@ -46,13 +47,13 @@ typedef struct
     int arrival_airport;
 } Plane;
 
-typedef struct
-{
-    long mtype;
-    int airport_id;
-    int status;  // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
-    Plane plane; // Plane details
-} Airport;
+// typedef struct
+// {
+//     long mtype;
+//     int airport_id;
+//     int status;  // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
+//     Plane plane; // Plane details
+// } Airport;
 
 typedef struct
 {
@@ -119,27 +120,27 @@ void *handlePlane(void *arg)
 
 void *handleArrival(void *arg)
 {
-    Airport *airport = (Airport *)arg;
-    Plane *plane = &airport->plane;
+    Plane *plane = (Plane *)arg;
+    // Plane *plane = &airport->plane;
     key_t key = ftok(".", 'a');
     int msgid = msgget(key, 0666);
 
     // Handle landing and deboarding/unloading
     sleep(60);
     handlePlane(plane);
-    //TODO: make this a simple hasArrived message DONE
-    // airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
-    // if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
-    // {
-    //     perror("msgsnd failed");
-    //     exit(1);
-    // }
+    // TODO: make this a simple hasArrived message DONE
+    //  airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
+    //  if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
+    //  {
+    //      perror("msgsnd failed");
+    //      exit(1);
+    //  }
 
     DeboardingMessage msg;
-    msg.mtype = plane->plane_id+30; 
+    msg.mtype = plane->plane_id + 30;
     msg.deboardingComplete = 1;
 
-    if(msgsnd(msgid, &msg, sizeof(msg), 0) == -1)
+    if (msgsnd(msgid, &msg, sizeof(msg), 0) == -1)
     {
         perror("msgsnd failed");
         exit(1);
@@ -154,15 +155,15 @@ void *handleArrival(void *arg)
 void *handleDeparture(void *arg)
 {
     printf("in handleDeparture\n");
-    Airport *airport = (Airport *)arg;
-    Plane *plane = &airport->plane;
+    Plane *plane = (Plane *)arg;
+    // Plane *plane = &airport->plane;
     key_t key = ftok(".", 'a');
     int msgid = msgget(key, 0666);
 
     // Handle takeoff
     handlePlane(plane);
     // printf("here\n");
-    //TODO: check whether the ATC recieves this message and continue from there DONE
+    // TODO: check whether the ATC recieves this message and continue from there DONE
     // airport->mtype = plane->plane_id + 20; // Send takeoff complete message
     // if (msgsnd(msgid, airport, sizeof(*airport), 0) != -1)
     // {
@@ -174,7 +175,7 @@ void *handleDeparture(void *arg)
     //     exit(1);
     // }
     TakeOffMessage msg;
-    msg.mtype = plane->plane_id+20; // or any other type you want
+    msg.mtype = plane->plane_id + 20; // or any other type you want
     msg.takeOff = 1;
 
     if (msgsnd(msgid, &msg, sizeof(msg), 0) != -1)
@@ -222,61 +223,69 @@ int main()
     // ftok to generate unique key
     key_t key = ftok(".", 'a');
     int msgid = msgget(key, 0666 | IPC_CREAT);
+    int temp_plane_id;
+    Plane planes[MAX_PLANES + 1];
 
+    int messageReceived[MAX_PLANES + 1] = {0};
     // Wait for messages from air traffic controller
     while (1)
     {
         // printf("heaer\n");
-        Airport airport;
+        // Airport airport;
         int mtype;
-        bool messageReceived = false;
-        for (mtype = 41+10*(airportDetails.airportNumber-1); mtype <= 40 + 10 * airportDetails.airportNumber; mtype++)
+        for (mtype = 41 + 10 * (airportDetails.airportNumber - 1); mtype <= 40 + 10 * airportDetails.airportNumber; mtype++)
         {
             // printf("here\n");
-            if (msgrcv(msgid, &airport, sizeof(airport), mtype, IPC_NOWAIT) != -1)
+            temp_plane_id = mtype%10  == 0 ? 10 : mtype%10; 
+            if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
                 // Handle message
                 printf("Received message from air traffic controller%d\n", mtype);
-                messageReceived = true;
+                messageReceived[temp_plane_id] = 1;
                 break;
             }
         }
-        for (mtype = 141+10*(airportDetails.airportNumber-1); mtype <= 140 + 10 * airportDetails.airportNumber; mtype++)
+        for (mtype = 141 + 10 * (airportDetails.airportNumber - 1); mtype <= 140 + 10 * airportDetails.airportNumber; mtype++)
         {
             // printf("here\n");
-            if (msgrcv(msgid, &airport, sizeof(airport), mtype, IPC_NOWAIT) != -1)
+            temp_plane_id = mtype%10  == 0 ? 10 : mtype%10;
+            if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
                 // Handle message
-                printf("Received message from air traffic controller%d\n", mtype);
-                messageReceived = true;
+                printf("Received message from air traffic controller %d\n", temp_plane_id);
+                messageReceived[temp_plane_id] = 1;
                 break;
             }
         }
 
-        if (messageReceived)
+        for (int i = 1; i <= MAX_PLANES; i++)
         {
-
-            if (thread_count >= MAX_THREADS)
+            if (messageReceived[i])
             {
-                fprintf(stderr, "Error: too many threads\n");
-                exit(1);
-            }
 
-            // If termination message, break the loop
-            // if (airport.plane.plane_id == -1)
-            //     break;
+                if (thread_count >= MAX_THREADS)
+                {
+                    fprintf(stderr, "Error: too many threads\n");
+                    exit(1);
+                }
 
-            // Create new thread to handle airport
-            pthread_t thread;
-            if (airport.mtype > 40+10*(airportDetails.airportNumber-1) && airport.mtype <= 40 + 10 * airportDetails.airportNumber)
-            {
-                printf("departure\n");
-                pthread_create(&threads[thread_count++], NULL, handleDeparture, (void *)&airport);
-            }
-            else if (airport.mtype > 140 + 10*(airportDetails.airportNumber-1) && airport.mtype <= 140 + 10 * airportDetails.airportNumber)
-            {
-                
-                pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&airport);
+                // If termination message, break the loop
+                // if (airport.plane.plane_id == -1)
+                //     break;
+
+                // Create new thread to handle airport
+                pthread_t thread;
+                if (planes[i].mtype > 40 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 40 + 10 * airportDetails.airportNumber)
+                {
+                    printf("departure\n");
+                    pthread_create(&threads[thread_count++], NULL, handleDeparture, (void *)&planes[i]);
+                }
+                else if (planes[i].mtype > 140 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 140 + 10 * airportDetails.airportNumber)
+                {
+
+                    pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&planes[i]);
+                }
+                messageReceived[i] = 0;
             }
         }
         // pthread_mutex_lock(&hasFinishedMutex);
