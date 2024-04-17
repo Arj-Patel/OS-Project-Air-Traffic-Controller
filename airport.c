@@ -97,8 +97,12 @@ void *handlePlane(void *arg)
     {
         if (plane->total_weight < airportDetails.runways[i].loadCapacity)
         {
+            int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
+            if(diff < minDiff){
+                bestFitIndex = i;
+                minDiff = diff;
+            }
             overWeight = 0;
-            break;
         }
     }
 
@@ -109,32 +113,33 @@ void *handlePlane(void *arg)
     }
     else
     {
-        while (bestFitIndex == -1)
-        {
-            for (int i = 0; i < airportDetails.numberOfRunways; i++)
-            {
-                // printf("plane %d waiting", plane->plane_id);
-                if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
-                {
-                    int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
-                    if (diff >= 0 && diff < minDiff)
-                    {
-                        if (bestFitIndex != -1)
-                        {
-                            pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-                        }
-                        bestFitIndex = i;
-                        minDiff = diff;
-                    }
-                    else
-                    {
-                        pthread_mutex_unlock(&airportDetails.runways[i].mutex);
-                    }
-                }
-            }
+        // while (bestFitIndex == -1)
+        // {
+            pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
+            // for (int i = 0; i < airportDetails.numberOfRunways; i++)
+            // {
+            //     // printf("plane %d waiting", plane->plane_id);
+            //     if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
+            //     {
+            //         int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
+            //         if (diff >= 0 && diff < minDiff)
+            //         {
+            //             if (bestFitIndex != -1)
+            //             {
+            //                 pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
+            //             }
+            //             bestFitIndex = i;
+            //             minDiff = diff;
+            //         }
+            //         else
+            //         {
+            //             pthread_mutex_unlock(&airportDetails.runways[i].mutex);
+            //         }
+            //     }
+            // }
 
             // If no suitable runway was found, sleep for a short period before the next iteration
-        }
+        // }
     }
 
     // if (bestFitIndex == -1)
