@@ -68,46 +68,91 @@ void *handlePlane(void *arg)
 {
     Plane *plane = (Plane *)arg;
     int bestFitIndex = -1;
+    int overWeight = 1;
     int minDiff = INT_MAX;
 
     // Find suitable runway and handle arrival or departure
+    // for (int i = 0; i < airportDetails.numberOfRunways; i++)
+    // {
+    //     if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
+    //     {
+    //         int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
+    //         if (diff >= 0 && diff < minDiff)
+    //         {
+    //             if (bestFitIndex != -1)
+    //             {
+    //                 pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
+    //             }
+    //             bestFitIndex = i;
+    //             minDiff = diff;
+    //         }
+    //         else
+    //         {
+    //             pthread_mutex_unlock(&airportDetails.runways[i].mutex);
+    //         }
+    //     }
+    // }
+
     for (int i = 0; i < airportDetails.numberOfRunways; i++)
     {
-        if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
+        if (plane->total_weight < airportDetails.runways[i].loadCapacity)
         {
-            int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
-            if (diff >= 0 && diff < minDiff)
-            {
-                if (bestFitIndex != -1)
-                {
-                    pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-                }
-                bestFitIndex = i;
-                minDiff = diff;
-            }
-            else
-            {
-                pthread_mutex_unlock(&airportDetails.runways[i].mutex);
-            }
+            overWeight = 0;
+            break;
         }
     }
 
-    if (bestFitIndex == -1)
+    if (overWeight)
     {
         bestFitIndex = airportDetails.numberOfRunways;
         pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
     }
+    else
+    {
+        while (bestFitIndex == -1)
+        {
+            for (int i = 0; i < airportDetails.numberOfRunways; i++)
+            {
+                // printf("plane %d waiting", plane->plane_id);
+                if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
+                {
+                    int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
+                    if (diff >= 0 && diff < minDiff)
+                    {
+                        if (bestFitIndex != -1)
+                        {
+                            pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
+                        }
+                        bestFitIndex = i;
+                        minDiff = diff;
+                    }
+                    else
+                    {
+                        pthread_mutex_unlock(&airportDetails.runways[i].mutex);
+                    }
+                }
+            }
+
+            // If no suitable runway was found, sleep for a short period before the next iteration
+        }
+    }
+
+    // if (bestFitIndex == -1)
+    // {
+    //     bestFitIndex = airportDetails.numberOfRunways;
+    //     pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
+    // }
 
     if (plane->arrival_airport == airportDetails.airportNumber)
     {
-        sleep(2); // Simulate landing
+        sleep(20); // Simulate landing
         printf("Plane %d has landed on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex + 1, airportDetails.airportNumber);
         sleep(3); // Simulate deboarding/unloading
         printf("Plane %d has completed deboarding/unloading\n", plane->plane_id);
     }
     else
     {
-        sleep(3); // Simulate boarding/loading
+        sleep(30); // Simulate boarding/loading
         printf("Plane %d has completed boarding/loading on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex + 1, airportDetails.airportNumber);
         sleep(2); // Simulate takeoff
         printf("Plane %d has taken off\n", plane->plane_id);
@@ -147,7 +192,7 @@ void *handleArrival(void *arg)
     }
 
     pthread_mutex_lock(&hasFinishedMutex);
-    hasFinished[*(int *)arg] = true;
+    hasFinished[plane->plane_id] = true;
     pthread_mutex_unlock(&hasFinishedMutex);
     pthread_exit(NULL);
 }
@@ -189,7 +234,7 @@ void *handleDeparture(void *arg)
     }
 
     pthread_mutex_lock(&hasFinishedMutex);
-    hasFinished[*(int *)arg] = true;
+    hasFinished[plane->plane_id] = true;
     pthread_mutex_unlock(&hasFinishedMutex);
 
     pthread_exit(NULL);
@@ -236,7 +281,7 @@ int main()
         for (mtype = 41 + 10 * (airportDetails.airportNumber - 1); mtype <= 40 + 10 * airportDetails.airportNumber; mtype++)
         {
             // printf("here\n");
-            temp_plane_id = mtype%10  == 0 ? 10 : mtype%10; 
+            temp_plane_id = mtype % 10 == 0 ? 10 : mtype % 10;
             if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
                 // Handle message
@@ -248,7 +293,7 @@ int main()
         for (mtype = 141 + 10 * (airportDetails.airportNumber - 1); mtype <= 140 + 10 * airportDetails.airportNumber; mtype++)
         {
             // printf("here\n");
-            temp_plane_id = mtype%10  == 0 ? 10 : mtype%10;
+            temp_plane_id = mtype % 10 == 0 ? 10 : mtype % 10;
             if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
                 // Handle message
