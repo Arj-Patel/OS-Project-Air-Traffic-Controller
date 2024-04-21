@@ -11,7 +11,6 @@ typedef struct {
 } Message;
 
 int main() {
-    int msgid;
     Message message;
     char input;
 
@@ -22,7 +21,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    message.mtype = 1;
+    message.mtype = 5270;
     message.terminate = 1;
 
     while (1) {

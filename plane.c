@@ -21,6 +21,7 @@ typedef struct
     int num_passengers;
     int departure_airport;
     int arrival_airport;
+    int terminate;
 } Plane;
 
 int main()
@@ -135,9 +136,17 @@ int main()
     sleep(3);
 
     // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
-    if (msgrcv(msgid, &plane, sizeof(plane), plane_id+10, 0) != -1)
+    if (msgrcv(msgid, &plane, sizeof(plane), plane_id + 10, 0) != -1)
     {
+        if (plane.terminate == 1)
+        {
+            printf("Plane requested to depart but ATC has started termination process\n");
+            return 0;
+        }
         printf("msg recieved\n");
+        sleep(3);
+
+        printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
     }
     else
     {
@@ -146,9 +155,6 @@ int main()
     }
 
     // Simulate the deboarding/unloading process
-    sleep(3);
-
-    printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
 
     return 0;
 }

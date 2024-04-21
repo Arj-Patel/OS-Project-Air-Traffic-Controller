@@ -9,9 +9,7 @@
 
 #define MAX_PLANES 10
 #define MAX_AIRPORTS 10
-#define TERMINATION_MTYPE 173
-#define DEPARTURE_MTYPE 174
-#define ARRIVAL_MTYPE 175
+#define TERMINATION_MTYPE 5270
 
 typedef struct
 {
@@ -34,6 +32,7 @@ typedef struct
     int num_passengers;
     int departure_airport;
     int arrival_airport;
+    int terminate;
 } Plane;
 
 // typedef struct
@@ -48,7 +47,7 @@ typedef struct
 {
     long mtype;
     int terminate;
-} Message;
+} TerminateMessage;
 
 int main()
 {
@@ -58,7 +57,9 @@ int main()
 
     Plane plane;
     // Airport airport;
-    Message message;
+    TerminateMessage message;
+    int startTermination = 0;
+    int toBreak = 0;
     FILE *file;
 
     key_t key = ftok(".", 'a');
@@ -92,24 +93,38 @@ int main()
     {
         if (msgrcv(msgid, &message, sizeof(message), TERMINATION_MTYPE, IPC_NOWAIT) != -1)
         {
-            if (message.terminate == 1)
-            {
-                break;
-            }
+            startTermination = 1;
         }
 
         for (int i = 1; i <= MAX_PLANES; i++)
         {
+            // if (startTermination != 1)
+            // {
             if (msgrcv(msgid, &planes[i], sizeof(planes[i]), i, IPC_NOWAIT) != -1)
             {
                 printf("plane %d asked to depart\n", i);
-                isPresent[i] = 1;
+                if (!startTermination)
+                {
+                    isPresent[i] = 1;
+                }
+                else
+                {
+                    printf("plane %d asked to depart but ATC has started termination process\n", i);
+                    planes[i].terminate = 1;
+                    planes[i].mtype = i + 10;
+                    if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
+                    {
+                        perror("msgsnd failed");
+                        exit(EXIT_FAILURE);
+                    }
+                }
             }
             else if (errno != ENOMSG)
             {
                 perror("msgrcv failed");
                 exit(EXIT_FAILURE);
             }
+            // }
         }
 
         for (int i = 1; i <= MAX_PLANES; i++)
@@ -152,8 +167,6 @@ int main()
                 //      }
                 //  }
 
-                
-
                 if (msgrcv(msgid, &tkoffmsg, sizeof(tkoffmsg), i + 20, IPC_NOWAIT) != -1)
                 {
                     printf("plane departed message received %d\n", i);
@@ -191,13 +204,13 @@ int main()
                         printf("plane arrived message %d\n", i);
                         // if (airports[planes[i].arrival_airport].status == 1)
                         // {
-                            hasArrived[i] = 1;
+                        hasArrived[i] = 1;
                         // }
                     }
                 }
 
                 // If the plane has arrived, inform the plane process
-                //TODO: check whether ATC is sending the below message or not. i.e. check if hasArrived[i] is 1 or not in line 181. DONE 
+                // TODO: check whether ATC is sending the below message or not. i.e. check if hasArrived[i] is 1 or not in line 181. DONE
                 if (hasArrived[i])
                 {
                     planes[i].mtype = i + 10;
@@ -216,6 +229,33 @@ int main()
                     isPresent[i] = 0;
                 }
             }
+        }
+        if (startTermination)
+        {
+            toBreak = 1;
+            for (int i = 0; i < MAX_PLANES; i++)
+            {
+                if (isPresent[i])
+                {
+                    toBreak = 0;
+                    break;
+                }
+            }
+        }
+        if (toBreak)
+        {
+            break;
+        }
+    }
+
+    for (int i = 1; i <= MAX_AIRPORTS; i++)
+    {
+        // send terminate message to all airports
+        message.mtype = i + 250;
+        if (msgsnd(msgid, &message, sizeof(message), 0) == -1)
+        {
+            perror("msgsnd failed");
+            exit(EXIT_FAILURE);
         }
     }
 
