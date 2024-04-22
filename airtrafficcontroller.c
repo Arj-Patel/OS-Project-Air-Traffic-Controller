@@ -187,9 +187,6 @@ int main()
                     {
                         printf("ATC sent arrival message %d\n", i);
                         hasSentArrivalMsg[i] = 1;
-                        // airports[planes[i].arrival_airport].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
-                        // airports[planes[i].arrival_airport].airport_id = planes[i].arrival_airport;
-                        // airports[planes[i].arrival_airport].plane = planes[i]; // Add plane details
                         planes[i].mtype = i + 140 + (planes[i].arrival_airport - 1) * 10;
                         if (msgsnd(msgid, &planes[i], sizeof(planes[i]), 0) == -1)
                         {
