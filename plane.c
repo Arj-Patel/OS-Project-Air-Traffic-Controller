@@ -109,11 +109,6 @@ int main()
     scanf("%d", &arrival_airport);
 
     Plane plane = {plane_id, plane_id, plane_type, total_weight, num_seats, departure_airport, arrival_airport};
-
-    // Send a message to the air traffic controller with the plane details
-    // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
-
-    // Create a message queue
     key_t key = ftok(".", 'a');
     int msgid = msgget(key, 0666 | IPC_CREAT);
     if (msgid == -1)
@@ -129,13 +124,10 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    // Simulate the boarding/loading process
     sleep(3);
 
-    // Simulate the journey
     sleep(3);
 
-    // Wait for a message from the air traffic controller indicating that the deboarding/unloading process is complete
     if (msgrcv(msgid, &plane, sizeof(plane), plane_id + 10, 0) != -1)
     {
         if (plane.terminate == 1)
@@ -144,7 +136,6 @@ int main()
             return 0;
         }
         printf("msg recieved\n");
-        sleep(3);
 
         printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
     }
