@@ -14,8 +14,6 @@
 
 pthread_t threads[MAX_THREADS];
 int thread_count = 0;
-bool hasFinished[MAX_THREADS];
-pthread_mutex_t hasFinishedMutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct
 {
@@ -54,15 +52,7 @@ typedef struct
     int terminate;
 } Plane;
 
-    int currentPlanes[MAX_PLANES] = {0};
-
-// typedef struct
-// {
-//     long mtype;
-//     int airport_id;
-//     int status;  // 0 for takeoff complete, 1 for landing and deboarding/unloading complete
-//     Plane plane; // Plane details
-// } Airport;
+int currentPlanes[MAX_PLANES + 1] = {0};
 
 typedef struct
 {
@@ -80,28 +70,7 @@ void *handlePlane(void *arg)
     int overWeight = 1;
     int minDiff = INT_MAX;
 
-    // Find suitable runway and handle arrival or departure
-    // for (int i = 0; i < airportDetails.numberOfRunways; i++)
-    // {
-    //     if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
-    //     {
-    //         int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
-    //         if (diff >= 0 && diff < minDiff)
-    //         {
-    //             if (bestFitIndex != -1)
-    //             {
-    //                 pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-    //             }
-    //             bestFitIndex = i;
-    //             minDiff = diff;
-    //         }
-    //         else
-    //         {
-    //             pthread_mutex_unlock(&airportDetails.runways[i].mutex);
-    //         }
-    //     }
-    // }
-
+    // find the best fit runway and determine if its overweight
     for (int i = 0; i < airportDetails.numberOfRunways; i++)
     {
         if (plane->total_weight < airportDetails.runways[i].loadCapacity)
@@ -118,130 +87,74 @@ void *handlePlane(void *arg)
 
     if (overWeight)
     {
+        // assign the default runway
         bestFitIndex = airportDetails.numberOfRunways;
-        pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
+        pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex); // blocking call to lock the backup runway
     }
     else
     {
-        // while (bestFitIndex == -1)
-        // {
-        pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
-        // for (int i = 0; i < airportDetails.numberOfRunways; i++)
-        // {
-        //     // printf("plane %d waiting", plane->plane_id);
-        //     if (pthread_mutex_trylock(&airportDetails.runways[i].mutex) == 0)
-        //     {
-        //         int diff = airportDetails.runways[i].loadCapacity - plane->total_weight;
-        //         if (diff >= 0 && diff < minDiff)
-        //         {
-        //             if (bestFitIndex != -1)
-        //             {
-        //                 pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-        //             }
-        //             bestFitIndex = i;
-        //             minDiff = diff;
-        //         }
-        //         else
-        //         {
-        //             pthread_mutex_unlock(&airportDetails.runways[i].mutex);
-        //         }
-        //     }
-        // }
-
-        // If no suitable runway was found, sleep for a short period before the next iteration
-        // }
+        // assign the best fit runway
+        pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex); // blocking call to lock the best fit runway
     }
-
-    // if (bestFitIndex == -1)
-    // {
-    //     bestFitIndex = airportDetails.numberOfRunways;
-    //     pthread_mutex_lock(&airportDetails.runways[bestFitIndex].mutex);
-    // }
 
     if (plane->arrival_airport == airportDetails.airportNumber)
     {
-        sleep(20); // Simulate landing
-        printf("Plane %d has landed on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex + 1, airportDetails.airportNumber);
+        sleep(2); // Simulate deboarding/unloading
         sleep(3); // Simulate deboarding/unloading
-        printf("Plane %d has completed deboarding/unloading\n", plane->plane_id);
+        printf("Plane %d has landed on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex + 1, airportDetails.airportNumber);
     }
     else
     {
-        sleep(30); // Simulate boarding/loading
+        sleep(3); // Boarding
+        sleep(2); // Takeoff
         printf("Plane %d has completed boarding/loading on Runway No. %d of Airport No. %d\n", plane->plane_id, bestFitIndex + 1, airportDetails.airportNumber);
-        sleep(2); // Simulate takeoff
-        printf("Plane %d has taken off\n", plane->plane_id);
     }
 
-    pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex);
-    // printf("here1\n");
-    // pthread_exit(NULL);
+    pthread_mutex_unlock(&airportDetails.runways[bestFitIndex].mutex); // unlock the runway
 }
 
 void *handleArrival(void *arg)
 {
     Plane *plane = (Plane *)arg;
-    // Plane *plane = &airport->plane;
-    key_t key = ftok(".", 'a');
+    key_t key = ftok(".", 527);
     int msgid = msgget(key, 0666);
 
-    // Handle landing and deboarding/unloading
-    sleep(60);
+    sleep(30); // simulate flight time
     handlePlane(plane);
-    // TODO: make this a simple hasArrived message DONE
-    //  airport->mtype = plane->plane_id + 30; // Send landing and deboarding/unloading complete message
-    //  if (msgsnd(msgid, airport, sizeof(*airport), 0) == -1)
-    //  {
-    //      perror("msgsnd failed");
-    //      exit(1);
-    //  }
 
     DeboardingMessage msg;
     msg.mtype = plane->plane_id + 30;
     msg.deboardingComplete = 1;
 
-    if (msgsnd(msgid, &msg, sizeof(msg), 0) == -1)
+    if (msgsnd(msgid, &msg, sizeof(msg), 0) == -1) // Send deboarding complete message to ATC
     {
         perror("msgsnd failed");
         exit(1);
     }
 
-    pthread_mutex_lock(&hasFinishedMutex);
-    hasFinished[plane->plane_id] = true;
-    pthread_mutex_unlock(&hasFinishedMutex);
+    // printf("Sent deboarding complete message to ATC for plane %d\n", plane->plane_id);
+
     currentPlanes[plane->plane_id] = 0;
     pthread_exit(NULL);
 }
 
 void *handleDeparture(void *arg)
 {
-    printf("in handleDeparture\n");
     Plane *plane = (Plane *)arg;
     // Plane *plane = &airport->plane;
-    key_t key = ftok(".", 'a');
+    key_t key = ftok(".", 527);
     int msgid = msgget(key, 0666);
 
     // Handle takeoff
     handlePlane(plane);
-    // printf("here\n");
-    // TODO: check whether the ATC recieves this message and continue from there DONE
-    // airport->mtype = plane->plane_id + 20; // Send takeoff complete message
-    // if (msgsnd(msgid, airport, sizeof(*airport), 0) != -1)
-    // {
-    //     printf("Sent takeoff complete message to ATC\n");
-    // }
-    // else
-    // {
-    //     perror("msgsnd failed");
-    //     exit(1);
-    // }
+
     TakeOffMessage msg;
-    msg.mtype = plane->plane_id + 20; // or any other type you want
+    msg.mtype = plane->plane_id + 20;
     msg.takeOff = 1;
 
-    if (msgsnd(msgid, &msg, sizeof(msg), 0) != -1)
+    if (msgsnd(msgid, &msg, sizeof(msg), 0) != -1) // Send takeoff complete message to ATC
     {
-        printf("Sent takeoff complete message to ATC\n");
+        // printf("Sent takeoff complete message to ATC for plane %d\n", plane->plane_id);
     }
     else
     {
@@ -249,10 +162,7 @@ void *handleDeparture(void *arg)
         exit(1);
     }
 
-    pthread_mutex_lock(&hasFinishedMutex);
-    hasFinished[plane->plane_id] = true;
-    pthread_mutex_unlock(&hasFinishedMutex);
-
+    currentPlanes[plane->plane_id] = 0;
     pthread_exit(NULL);
 }
 
@@ -266,9 +176,9 @@ int main()
     scanf("%d", &airportDetails.numberOfRunways);
 
     // Initialize runways
+    printf("Enter  loadCapacity  of  Runways  (give  as  a  space  separated  list  in  a single line):");
     for (int i = 0; i < airportDetails.numberOfRunways; i++)
     {
-        printf("Enter loadCapacity of Runway %d: ", i + 1);
         scanf("%d", &airportDetails.runways[i].loadCapacity);
         pthread_mutex_init(&airportDetails.runways[i].mutex, NULL); // Initialize mutex
     }
@@ -277,52 +187,40 @@ int main()
     airportDetails.runways[airportDetails.numberOfRunways].loadCapacity = 15000;             // Set load capacity
     pthread_mutex_init(&airportDetails.runways[airportDetails.numberOfRunways].mutex, NULL); // Initialize mutex
 
-    // Set up message queue
-    // key_t key;
-    // int msgid;
-
-    // ftok to generate unique key
-
     int toBreak = 0;
     TerminateMessage tmsg;
     int terminateAirport = 0;
-    key_t key = ftok(".", 'a');
+    key_t key = ftok(".", 527);
     int msgid = msgget(key, 0666 | IPC_CREAT);
     int temp_plane_id;
     Plane planes[MAX_PLANES + 1];
     int messageReceived[MAX_PLANES + 1] = {0};
-    // Wait for messages from air traffic controller
+
     while (1)
     {
-        // printf("heaer\n");
-        // Airport airport;
         if (msgrcv(msgid, &tmsg, sizeof(tmsg), airportDetails.airportNumber + 250, IPC_NOWAIT) != -1)
         {
-            // Handle message
             terminateAirport = 1;
         }
 
         int mtype;
         for (mtype = 41 + 10 * (airportDetails.airportNumber - 1); mtype <= 40 + 10 * airportDetails.airportNumber; mtype++)
         {
-            // printf("here\n");
             temp_plane_id = mtype % 10 == 0 ? 10 : mtype % 10;
             if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
-                // Handle message
-                printf("Received message from air traffic controller%d\n", mtype);
+                // printf("Received message from air traffic controller for plane %d\n", temp_plane_id);
                 messageReceived[temp_plane_id] = 1;
                 break;
             }
         }
+
         for (mtype = 141 + 10 * (airportDetails.airportNumber - 1); mtype <= 140 + 10 * airportDetails.airportNumber; mtype++)
         {
-            // printf("here\n");
             temp_plane_id = mtype % 10 == 0 ? 10 : mtype % 10;
             if (msgrcv(msgid, &planes[temp_plane_id], sizeof(planes[temp_plane_id]), mtype, IPC_NOWAIT) != -1)
             {
-                // Handle message
-                printf("Received message from air traffic controller %d\n", temp_plane_id);
+                // printf("Received message from air traffic controller for plane %d\n", temp_plane_id);
                 messageReceived[temp_plane_id] = 1;
                 break;
             }
@@ -338,19 +236,13 @@ int main()
                     fprintf(stderr, "Error: too many threads\n");
                     exit(1);
                 }
-
-                // If termination message, break the loop
-                // if (airport.plane.plane_id == -1)
-                //     break;
-
-                // Create new thread to handle airport
                 pthread_t thread;
-                if (planes[i].mtype > 40 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 40 + 10 * airportDetails.airportNumber)
+                if (planes[i].mtype > 40 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 40 + 10 * airportDetails.airportNumber) // the plane wants to depart
                 {
-                    printf("departure\n");
                     pthread_create(&threads[thread_count++], NULL, handleDeparture, (void *)&planes[i]);
+                    currentPlanes[mtype % 10 == 0 ? 10 : mtype % 10] = 1;
                 }
-                else if (planes[i].mtype > 140 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 140 + 10 * airportDetails.airportNumber)
+                else if (planes[i].mtype > 140 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 140 + 10 * airportDetails.airportNumber) // the plane wants to arrive
                 {
                     currentPlanes[mtype % 10 == 0 ? 10 : mtype % 10] = 1;
                     pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&planes[i]);
@@ -358,44 +250,42 @@ int main()
                 messageReceived[i] = 0;
             }
         }
-        // pthread_mutex_lock(&hasFinishedMutex);
-        // for (int i = 0; i < thread_count; i++)
-        // {
-        //     if (hasFinished[i])
-        //     {
-        //         pthread_join(threads[i], NULL);
-        //         // Shift remaining threads down
-        //         for (int j = i; j < thread_count - 1; j++)
-        //         {
-        //             threads[j] = threads[j + 1];
-        //             hasFinished[j] = hasFinished[j + 1];
-        //         }
-        //         thread_count--;
-        //         i--; // Decrement i to account for the removed thread
-        //     }
-        // }
-        // pthread_mutex_unlock(&hasFinishedMutex);
-        if(terminateAirport)
+
+        // check if all planes have landed and taken off and terminate if needed
+        if (terminateAirport)
         {
             toBreak = 1;
-            for(int i = 0; i < MAX_PLANES; i++)
+            for (int i = 0; i < MAX_PLANES; i++)
             {
-                if(currentPlanes[i]){
+                if (currentPlanes[i])
+                {
                     toBreak = 0;
                     break;
                 }
             }
         }
-        if(toBreak)
+        if (toBreak)
         {
             break;
         }
     }
 
+    // wait for all threads to finish
     for (int i = 0; i < thread_count; i++)
     {
         pthread_join(threads[i], NULL);
     }
+
+    // Cleanup
+    for (int i = 0; i < airportDetails.numberOfRunways; i++)
+    {
+        pthread_mutex_destroy(&airportDetails.runways[i].mutex);
+    }
+
+    // Send termination message to airtrafficcontroller
+    tmsg.terminate = 1;
+    tmsg.mtype = airportDetails.airportNumber + 270;
+    msgsnd(msgid, &tmsg, sizeof(tmsg), 0);
 
     return 0;
 }

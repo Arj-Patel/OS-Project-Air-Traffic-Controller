@@ -14,7 +14,7 @@ int main() {
     Message message;
     char input;
 
-    key_t key = ftok(".", 'a');
+    key_t key = ftok(".", 527);
     int msgid = msgget(key, 0666 | IPC_CREAT);
     if (msgid == -1) {
         perror("msgget failed");

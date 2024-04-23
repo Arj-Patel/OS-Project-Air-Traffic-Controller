@@ -6,11 +6,10 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
-#define MAX_PASSENGERS 10
-#define MAX_CARGO_ITEMS 100
-#define MAX_WEIGHT 100
+#define MAX_PASSENGERS 15
+#define MAX_CARGO_ITEMS 150
 #define CREW_WEIGHT 75
-#define MAX_AIRPORTS 10
+#define MAX_AIRPORTS 15
 
 typedef struct
 {
@@ -30,7 +29,7 @@ int main()
     int departure_airport, arrival_airport;
     int total_weight = 0;
     int i, luggage_weight, body_weight;
-    int pipefd[2];
+
     pid_t pid;
 
     printf("Enter Plane ID: ");
@@ -39,13 +38,14 @@ int main()
     printf("Enter Type of Plane: ");
     scanf("%d", &plane_type);
 
-    if (plane_type == 1)
+    if (plane_type == 1) // Passenger Plane
     {
         printf("Enter Number of Occupied Seats: ");
         scanf("%d", &num_seats);
 
         for (i = 0; i < num_seats; i++)
         {
+            int pipefd[2];
             if (pipe(pipefd) == -1)
             {
                 perror("pipe");
@@ -75,7 +75,7 @@ int main()
                 close(pipefd[1]);
                 exit(EXIT_SUCCESS);
             }
-            else
+            else // Parent process
             {
                 close(pipefd[1]);
 
@@ -91,7 +91,7 @@ int main()
 
         total_weight += 7 * CREW_WEIGHT;
     }
-    else
+    else // cargo plane
     {
         printf("Enter Number of Cargo Items: ");
         scanf("%d", &num_cargo_items);
@@ -109,8 +109,8 @@ int main()
     scanf("%d", &arrival_airport);
 
     Plane plane = {plane_id, plane_id, plane_type, total_weight, num_seats, departure_airport, arrival_airport};
-    key_t key = ftok(".", 'a');
-    int msgid = msgget(key, 0666 | IPC_CREAT);
+    key_t key = ftok(".", 527);
+    int msgid = msgget(key, 0666 | IPC_CREAT); // Including IPC_CREAT flag in case plane process is created before ATC process
     if (msgid == -1)
     {
         perror("msgget");
@@ -124,18 +124,14 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    sleep(3);
-
-    sleep(3);
-
+    // Receive a message from the air traffic controller
     if (msgrcv(msgid, &plane, sizeof(plane), plane_id + 10, 0) != -1)
     {
         if (plane.terminate == 1)
         {
-            printf("Plane requested to depart but ATC has started termination process\n");
+            printf("Plane %d requested to depart but ATC has started termination process\n", plane_id);
             return 0;
         }
-        printf("msg recieved\n");
 
         printf("Plane %d has successfully traveled from Airport %d to Airport %d!\n", plane_id, departure_airport, arrival_airport);
     }
@@ -144,8 +140,6 @@ int main()
         perror("msgrcv");
         exit(EXIT_FAILURE);
     }
-
-    // Simulate the deboarding/unloading process
 
     return 0;
 }
