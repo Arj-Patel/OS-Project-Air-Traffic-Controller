@@ -1,3 +1,4 @@
 *.exe
 *.pdf
 *.txt
+.vscode
