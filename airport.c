@@ -239,12 +239,14 @@ int main()
                 pthread_t thread;
                 if (planes[i].mtype > 40 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 40 + 10 * airportDetails.airportNumber) // the plane wants to depart
                 {
+                    // printf("hello %d\n", mtype % 10 == 0 ? 10 : mtype % 10);
                     pthread_create(&threads[thread_count++], NULL, handleDeparture, (void *)&planes[i]);
-                    currentPlanes[mtype % 10 == 0 ? 10 : mtype % 10] = 1;
+                    currentPlanes[planes[i].mtype % 10 == 0 ? 10 : planes[i].mtype % 10] = 1;
                 }
                 else if (planes[i].mtype > 140 + 10 * (airportDetails.airportNumber - 1) && planes[i].mtype <= 140 + 10 * airportDetails.airportNumber) // the plane wants to arrive
                 {
-                    currentPlanes[mtype % 10 == 0 ? 10 : mtype % 10] = 1;
+                    // printf("hii %d\n", mtype % 10 == 0 ? 10 : mtype % 10);
+                    currentPlanes[planes[i].mtype % 10 == 0 ? 10 : planes[i].mtype % 10] = 1;
                     pthread_create(&threads[thread_count++], NULL, handleArrival, (void *)&planes[i]);
                 }
                 messageReceived[i] = 0;
@@ -259,6 +261,7 @@ int main()
             {
                 if (currentPlanes[i])
                 {
+                    // printf("%d %d\n", i, currentPlanes[i]);
                     toBreak = 0;
                     break;
                 }
